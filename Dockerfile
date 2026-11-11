@@ -36,10 +36,13 @@ RUN if [ -n "${APT_MIRROR}" ]; then \
 RUN --mount=type=bind,source=wheels,target=/tmp/wheels \
     pip install --index-url "${PIP_INDEX_URL}" filelock typing-extensions sympy networkx jinja2 fsspec setuptools \
       numpy==2.4.6 pillow==10.4.0 \
- && if ls /tmp/wheels/torch-*.whl >/dev/null 2>&1; then \
-      pip install --no-deps /tmp/wheels/*.whl; \
+ && ARCH="$(uname -m)" \
+ && if ls /tmp/wheels/torch-*"${ARCH}".whl >/dev/null 2>&1; then \
+      pip install --no-deps /tmp/wheels/torch-*"${ARCH}".whl /tmp/wheels/torchvision-*"${ARCH}".whl; \
     elif echo "${TORCH_INDEX}" | grep -q '/cpu'; then \
-      pip install --no-deps --index-url "${TORCH_INDEX}" torch==${TORCH_VERSION} torchvision==${TORCHVISION_VERSION}; \
+      pip install --no-deps --index-url "${TORCH_INDEX}" torch==${TORCH_VERSION} torchvision==${TORCHVISION_VERSION} \
+      || { echo "torch index unreachable, falling back to PyPI (larger CUDA build, also runs on CPU)"; \
+           pip install --index-url "${PIP_INDEX_URL}" torch==${TORCH_VERSION} torchvision==${TORCHVISION_VERSION}; }; \
     else \
       pip install --index-url "${TORCH_INDEX}" --extra-index-url "${PIP_INDEX_URL}" torch==${TORCH_VERSION} torchvision==${TORCHVISION_VERSION}; \
     fi \
