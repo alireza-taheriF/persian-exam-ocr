@@ -1,0 +1,10 @@
+{
+ "page": "docs/images/test_sheet_ewc.jpg",
+ "engine": "qwen3vl-fa (offline, ruled-line router)",
+ "ground_truth": "eval/ewc_sheet_ground_truth.txt",
+ "hypothesis": "1 Elastic Weight Consolidation (EWC)\n\n2 Elastic Weight Consolidation (EWCI)\n\nایده دیدند در زاده و زرخانهٔ ۵۸ جز برای شکوی عقل منجر شدند بدن\n\nبدد مطوفی بی بادکرده همه چه\n\n5 4\n\n6 5\n\n6 7\n\nتعداد دیدی یا باید را و اعفاف نمی‌برند 8\n\n9 Syndatic Consolidation،\n\n10 سیستمیک (سیستمیک)\n\nکودریهٔ 11 Constraints 12 کودریه١٣\n\nکورهٔ 12 constraints 12\n\nمدّتس فریه‌هیهٔ\n\nسمنی سخنگوی رسانی سخندهٔ سخن دفتر مربی که چو همه\n\nبدآمد ندند 14 سعی احمد بادیسی مسیر دهره‌یی کند چونده هر\n\nکه تلقیه کر همیک سیه وزید ، بمع تلقیه پروردی شد اوع 15\n\n16 به سخن گوید در وریهٔ میانهٔ (۱) می‌آمد 17\n\n18 گاه هنریکه و زره تانیه فرع رهنگه اند ناساید 19\n\nسخن ابرهمند پرایه در هک امنه نیکیم احسیه اند لشیر و بیه\n\n20\n\n2017، 5 و 2 اشایه‌روز عیانه\n\nعمد و هنوز رویک اولانهٔ میشاید بهره گرفته اولند",
+ "char_accuracy_pct": 30.48,
+ "word_accuracy_pct": 5.93,
+ "note": "Page-level, after normalization; the printed notebook line numbers are removed from both sides. Informal, cursive, mixed Persian/English notes: much harder than the gold set.",
+ "seconds_per_page_m2_mps": 38.6
+}

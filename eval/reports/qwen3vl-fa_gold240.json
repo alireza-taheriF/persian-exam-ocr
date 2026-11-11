@@ -1,0 +1,41 @@
+{
+ "label": "qwen3vl-fa_gold240",
+ "engine": "qwen3vl-fa",
+ "post_correction": false,
+ "gold_rows": 240,
+ "scored_lines": 168,
+ "cer": 0.3608,
+ "wer": 0.7386,
+ "char_accuracy_pct": 63.92,
+ "word_accuracy_pct": 26.14,
+ "cer_ci95": [
+  0.3205,
+  0.4026
+ ],
+ "exact_line_match_pct": 5.95,
+ "illegible_rows_returned_empty_pct": 25.0,
+ "seconds_per_line_median": 0.98,
+ "per_document": {
+  "CamScanner_۲۰۲۵-۰۶-۰۳_۲۲_۳۲": {
+   "lines": 40,
+   "cer": 0.3447,
+   "wer": 0.7656
+  },
+  "جزوه_دست_نویس_اصول_حسابداری_1": {
+   "lines": 34,
+   "cer": 0.4786,
+   "wer": 0.8623
+  },
+  "جزوه_ریاضی_پیش__نیکوکار_mathfree": {
+   "lines": 34,
+   "cer": 0.5122,
+   "wer": 0.75
+  },
+  "مقدمات_راهنمایی_و_مشاوره": {
+   "lines": 60,
+   "cer": 0.3098,
+   "wer": 0.6833
+  }
+ },
+ "created": "2026-11-11T15:55:04"
+}

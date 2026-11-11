@@ -1,0 +1,20 @@
+# Only the source and the prepared offline model cache go into the image.
+.git
+.github
+.env
+.env.*
+!.env.example
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.venv*
+venv
+uploads
+outputs
+logs
+data
+dist
+*.tar
+*.tar.gz
+*.zip
+.DS_Store

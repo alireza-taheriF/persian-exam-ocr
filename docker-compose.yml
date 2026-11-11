@@ -1,0 +1,21 @@
+services:
+  exam-ocr:
+    image: persian-exam-ocr:1.0
+    container_name: persian-exam-ocr
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - OCR_ALLOW_REMOTE=0          # images never leave the server
+      - OCR_POST_CORRECT=0          # set 1 only if a local Ollama server is reachable
+    volumes:
+      - ./outputs:/app/outputs      # generated Word files
+      - ./logs:/app/logs
+    # Uncomment on an NVIDIA server with the -gpu image and nvidia-container-toolkit:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
