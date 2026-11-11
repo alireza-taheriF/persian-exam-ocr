@@ -21,6 +21,8 @@ models/*
 !models/README.md
 dist/
 wheels/*.whl
+wheels/*.part
+wheels/.complete
 *.tar
 *.tar.gz
 *.zip

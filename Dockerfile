@@ -5,57 +5,69 @@
 #
 # GPU variant (NVIDIA): add  --build-arg TORCH_INDEX=https://download.pytorch.org/whl/cu126
 # Mirrors (e.g. inside Iran): --build-arg BASE_IMAGE=docker.arvancloud.ir/library/python:3.12-slim
-#                             --build-arg PIP_INDEX_URL=https://mirror-pypi.runflare.com/simple
-#                             --build-arg APT_MIRROR=http://repo.iut.ac.ir/debian
+#                             --build-arg PIP_INDEX_URL=https://package-mirror.liara.ir/repository/pypi/simple
+#                             --build-arg APT_MIRROR=https://mirror.iranserver.com/debian
 ARG BASE_IMAGE=python:3.12-slim
 FROM ${BASE_IMAGE}
 
 ARG TORCH_INDEX=https://download.pytorch.org/whl/cpu
 ARG PIP_INDEX_URL=https://pypi.org/simple
 ARG TORCH_VERSION=2.12.0
-# Optional Debian mirror, e.g. http://repo.iut.ac.ir/debian
+# Optional Debian mirror, e.g. https://mirror.iranserver.com/debian
 ARG APT_MIRROR=
 ARG TORCHVISION_VERSION=0.27.0
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_DEFAULT_TIMEOUT=120 \
+    PIP_RETRIES=10
 
 RUN if [ -n "${APT_MIRROR}" ]; then \
       printf 'Types: deb\nURIs: %s\nSuites: trixie trixie-updates\nComponents: main\nSigned-By: /usr/share/keyrings/debian-archive-keyring.gpg\n' "${APT_MIRROR}" \
         > /etc/apt/sources.list.d/debian.sources; fi \
+ && echo "Acquire::Retries \"10\";" > /etc/apt/apt.conf.d/80retries \
  && apt-get update \
  && apt-get install -y --no-install-recommends libglib2.0-0 libgl1 curl \
  && rm -rf /var/lib/apt/lists/*
 
-# torch is installed once in the system interpreter and shared by both environments.
-# If wheels/ holds torch/torchvision .whl files they are used (handy when the torch index is
-# unreachable from the build network); otherwise they come from TORCH_INDEX.
-# Dependencies come from PIP_INDEX_URL, so a PyPI mirror is enough besides the torch index.
+# All Python packages are installed from wheels/ when scripts/install.sh has filled it
+# (wheels/.complete); the build then needs no package index at all. Otherwise they come from
+# PIP_INDEX_URL (+ TORCH_INDEX for torch). torch lives in the system interpreter and is shared
+# by both environments.
+ARG PIP_FALLBACK_INDEX=https://pypi.org/simple
 RUN --mount=type=bind,source=wheels,target=/tmp/wheels \
-    pip install --index-url "${PIP_INDEX_URL}" filelock typing-extensions sympy networkx jinja2 fsspec setuptools \
-      numpy==2.4.6 pillow==10.4.0 \
- && ARCH="$(uname -m)" \
- && if ls /tmp/wheels/torch-*"${ARCH}".whl >/dev/null 2>&1; then \
-      pip install --no-deps /tmp/wheels/torch-*"${ARCH}".whl /tmp/wheels/torchvision-*"${ARCH}".whl; \
-    elif echo "${TORCH_INDEX}" | grep -q '/cpu'; then \
-      pip install --no-deps --index-url "${TORCH_INDEX}" torch==${TORCH_VERSION} torchvision==${TORCHVISION_VERSION} \
-      || { echo "torch index unreachable, falling back to PyPI (larger CUDA build, also runs on CPU)"; \
-           pip install --index-url "${PIP_INDEX_URL}" torch==${TORCH_VERSION} torchvision==${TORCHVISION_VERSION}; }; \
+    if [ -f /tmp/wheels/.complete ]; then \
+      pip install --no-index --find-links /tmp/wheels torch==${TORCH_VERSION} torchvision==${TORCHVISION_VERSION}; \
     else \
-      pip install --index-url "${TORCH_INDEX}" --extra-index-url "${PIP_INDEX_URL}" torch==${TORCH_VERSION} torchvision==${TORCHVISION_VERSION}; \
+      pip install --index-url "${PIP_INDEX_URL}" filelock typing-extensions sympy networkx jinja2 fsspec setuptools \
+        numpy==2.4.6 pillow==10.4.0 \
+      && if echo "${TORCH_INDEX}" | grep -q '/cpu'; then \
+        pip install --no-deps --index-url "${TORCH_INDEX}" torch==${TORCH_VERSION} torchvision==${TORCHVISION_VERSION} \
+        || pip install --index-url "${PIP_INDEX_URL}" torch==${TORCH_VERSION} torchvision==${TORCHVISION_VERSION}; \
+      else \
+        pip install --index-url "${TORCH_INDEX}" --extra-index-url "${PIP_INDEX_URL}" torch==${TORCH_VERSION} torchvision==${TORCHVISION_VERSION}; \
+      fi; \
     fi \
  && python -c "import torch, torchvision; print('torch', torch.__version__)"
 
 WORKDIR /app
 COPY requirements-app.txt requirements-ocr.txt ./
-# Web app + Surya layout (transformers 4.45)
-RUN python -m venv --system-site-packages /opt/app \
- && /opt/app/bin/pip install --index-url "${PIP_INDEX_URL}" -r requirements-app.txt
-# Line recognizer worker (transformers 5.x)
-RUN python -m venv --system-site-packages /opt/ocr \
- && /opt/ocr/bin/pip install --index-url "${PIP_INDEX_URL}" -r requirements-ocr.txt
+# Web app + Surya layout (transformers 4.45) and the line-recognizer worker (transformers 5.x)
+RUN --mount=type=bind,source=wheels,target=/tmp/wheels \
+    python -m venv --system-site-packages /opt/app \
+ && python -m venv --system-site-packages /opt/ocr \
+ && if [ -f /tmp/wheels/.complete ]; then \
+      SRC="--no-index --find-links /tmp/wheels"; \
+      /opt/app/bin/pip install $SRC -r requirements-app.txt \
+      && /opt/ocr/bin/pip install $SRC -r requirements-ocr.txt; \
+    else \
+      { /opt/app/bin/pip install --index-url "${PIP_INDEX_URL}" -r requirements-app.txt \
+        || /opt/app/bin/pip install --index-url "${PIP_FALLBACK_INDEX}" -r requirements-app.txt; } \
+      && { /opt/ocr/bin/pip install --index-url "${PIP_INDEX_URL}" -r requirements-ocr.txt \
+        || /opt/ocr/bin/pip install --index-url "${PIP_FALLBACK_INDEX}" -r requirements-ocr.txt; }; \
+    fi
 
 # Model weights first (large, rarely change), then the source. Nothing is downloaded at runtime.
 COPY models/hf /app/models/hf
