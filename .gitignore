@@ -20,6 +20,7 @@ venv/
 models/*
 !models/README.md
 dist/
+wheels/*.whl
 *.tar
 *.tar.gz
 *.zip

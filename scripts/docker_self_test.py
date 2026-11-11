@@ -74,10 +74,15 @@ def lexicon() -> str:
 
 
 def one_line_ocr() -> str:
+    """Read one line through the same worker subprocess (OCR_PYTHON) the web app uses."""
     from PIL import Image
-    from htr_eval.engines import load_engine
+    import pipeline.ocr as ocr
     img = Image.open(ROOT / "test_fixtures" / "sample_exam.png").convert("RGB")
-    text = load_engine(os.environ.get("OCR_ENGINE", "qwen3vl-fa")).recognize(img.crop((0, 0, img.width, 120)))["text"]
+    try:
+        text = ocr.recognize_line(img.crop((0, 0, img.width, 120)))
+    finally:
+        if ocr._WORKER is not None:
+            ocr._WORKER.kill()
     return repr(text[:40])
 
 

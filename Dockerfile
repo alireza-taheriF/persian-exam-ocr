@@ -30,10 +30,15 @@ RUN if [ -n "${APT_MIRROR}" ]; then \
  && rm -rf /var/lib/apt/lists/*
 
 # torch is installed once in the system interpreter and shared by both environments.
-# (dependencies come from PIP_INDEX_URL so a PyPI mirror is enough besides the torch index)
-RUN pip install --index-url "${PIP_INDEX_URL}" filelock typing-extensions sympy networkx jinja2 fsspec setuptools \
+# If wheels/ holds torch/torchvision .whl files they are used (handy when the torch index is
+# unreachable from the build network); otherwise they come from TORCH_INDEX.
+# Dependencies come from PIP_INDEX_URL, so a PyPI mirror is enough besides the torch index.
+RUN --mount=type=bind,source=wheels,target=/tmp/wheels \
+    pip install --index-url "${PIP_INDEX_URL}" filelock typing-extensions sympy networkx jinja2 fsspec setuptools \
       numpy==2.4.6 pillow==10.4.0 \
- && if echo "${TORCH_INDEX}" | grep -q '/cpu'; then \
+ && if ls /tmp/wheels/torch-*.whl >/dev/null 2>&1; then \
+      pip install --no-deps /tmp/wheels/*.whl; \
+    elif echo "${TORCH_INDEX}" | grep -q '/cpu'; then \
       pip install --no-deps --index-url "${TORCH_INDEX}" torch==${TORCH_VERSION} torchvision==${TORCHVISION_VERSION}; \
     else \
       pip install --index-url "${TORCH_INDEX}" --extra-index-url "${PIP_INDEX_URL}" torch==${TORCH_VERSION} torchvision==${TORCHVISION_VERSION}; \
@@ -49,8 +54,16 @@ RUN python -m venv --system-site-packages /opt/app \
 RUN python -m venv --system-site-packages /opt/ocr \
  && /opt/ocr/bin/pip install --index-url "${PIP_INDEX_URL}" -r requirements-ocr.txt
 
-# Source code and model weights; nothing is downloaded at runtime.
-COPY . /app
+# Model weights first (large, rarely change), then the source. Nothing is downloaded at runtime.
+COPY models/hf /app/models/hf
+COPY main.py LICENSE README.md /app/
+COPY pipeline /app/pipeline
+COPY htr_eval /app/htr_eval
+COPY training /app/training
+COPY scripts /app/scripts
+COPY static /app/static
+COPY docs /app/docs
+COPY test_fixtures /app/test_fixtures
 
 ENV PATH=/opt/app/bin:$PATH \
     HF_HOME=/app/models/hf \
