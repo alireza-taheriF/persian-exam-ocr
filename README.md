@@ -49,6 +49,7 @@ flowchart LR
 |:--|:--:|:--:|:--:|:--:|
 | **Qwen3-VL-2B فارسی (پیش‌فرض)** | **۶۳٫۹٪** | **۲۶٫۱٪** | ۵۹٫۷٪ تا ۶۸٫۰٪ | ~۱ ثانیه برای هر خط (Apple M2) |
 | همان + تصحیح با LLM محلی (`qwen3:8b`) | ۶۳٫۹٪ | ۲۶٫۱٪ | ۵۹٫۷٪ تا ۶۷٫۹٪ | کندتر؛ بهبودی نداشت و پیش‌فرض خاموش است |
+| فاین‌تیون اختصاصی پروژه (LoRA، `adapters/`) | ۶۳٫۵٪ | ۲۱٫۳٪ | ۵۹٫۰٪ تا ۶۷٫۶٪ | مثل پیش‌فرض؛ روی یکی از جزوه‌ها بهتر و روی بقیه ضعیف‌تر، پس اختیاری است |
 
 دقت به نوع دست‌خط بستگی زیادی دارد: روی جزوه‌های مرتب تا حدود ۶۹٪ دقت کاراکتری، و روی یک صفحهٔ یادداشت شخصی محاوره‌ای و ترکیبی فارسی/انگلیسی (`docs/images/test_sheet_ewc.jpg`) حدود ۳۰٪. جزئیات هر سند در [`eval/reports/`](eval/reports) آمده است.
 
@@ -65,26 +66,34 @@ HF_HOME=models/hf HF_HUB_OFFLINE=1 python scripts/eval_release.py \
 
 **پیش‌نیاز:** یک سرور لینوکسی x86-64 با Docker، حداقل **۱۶ گیگابایت RAM** (مدل روی CPU حدود ۹ گیگابایت حافظه می‌گیرد) و ۲۰ گیگابایت فضای خالی دیسک. GPU لازم نیست؛ با GPU سرعت چند برابر می‌شود.
 
-### الف) با فایل ایمیج آماده (بدون نیاز به اینترنت)
-
-```bash
-sha256sum -c persian-exam-ocr-1.0.tar.gz.sha256     # بررسی سالم بودن فایل
-docker load -i persian-exam-ocr-1.0.tar.gz
-mkdir -p outputs logs && sudo chown 1000:1000 outputs logs
-docker compose up -d                                  # یا: docker run -d -p 8000:8000 persian-exam-ocr:1.0
-```
-
-سپس `http://<آدرس-سرور>:8000` را باز کنید. در اولین اجرا یک آزمون خودکار (self-test) وجود همهٔ مدل‌ها و اجزا را بررسی می‌کند و اگر چیزی کم باشد، سرویس بالا نمی‌آید.
-
-### ب) ساخت ایمیج از روی کد
+### الف) نصب با یک دستور روی سرور (پیشنهادی)
 
 ```bash
 git clone https://github.com/alireza-taheriF/persian-exam-ocr.git && cd persian-exam-ocr
-./scripts/prepare_models.sh                           # دانلود یک‌بارهٔ مدل‌ها (~۴٫۸ گیگابایت)
-docker buildx build --platform linux/amd64 -t persian-exam-ocr:1.0 .
+IRAN_MIRRORS=1 ./scripts/install.sh
 ```
 
-برای سرورهای دارای GPU انویدیا، هنگام build این گزینه را اضافه کنید: `--build-arg TORCH_INDEX=https://download.pytorch.org/whl/cu126`. سپس بخش `deploy` را در `docker-compose.yml` فعال کنید. اگر Docker Hub یا PyPI در دسترس نیست، از mirror استفاده کنید (نمونه‌ها در ابتدای `Dockerfile`).
+اسکریپت سه کار را انجام می‌دهد:
+
+1. مدل‌ها (حدود ۴٫۸ گیگابایت) را یک بار از Hugging Face دانلود می‌کند.
+2. ایمیج Docker آفلاین را می‌سازد.
+3. سرویس را بالا می‌آورد.
+
+اگر وسط کار قطع شد، دوباره اجرایش کنید؛ از همان‌جا ادامه می‌دهد. بعد از پایان، سرور برای کار کردن به اینترنت نیاز ندارد.
+
+- `IRAN_MIRRORS=1`: استفاده از mirrorهای داخلی برای Docker، PyPI و Debian. بیرون از ایران حذفش کنید.
+- `GPU=1`: ساخت نسخهٔ NVIDIA. بخش `deploy` در `docker-compose.yml` را هم فعال کنید.
+- `PORT=8080`: تغییر پورت (پیش‌فرض 8000).
+
+سپس `http://<آدرس-سرور>:8000` را باز کنید. هر بار که کانتینر بالا می‌آید، یک آزمون خودکار (self-test) وجود همهٔ مدل‌ها و اجزا را بررسی می‌کند و اگر چیزی کم باشد، سرویس بالا نمی‌آید.
+
+### ب) ساخت دستی ایمیج
+
+```bash
+./scripts/prepare_models.sh
+docker build -t persian-exam-ocr:1.0 .
+docker compose up -d
+```
 
 ### ج) اجرا بدون Docker (برای توسعه)
 
@@ -129,7 +138,7 @@ curl -o result.docx http://ocr.university.local:8000/download/<job_id>
 
 | متغیر | پیش‌فرض | توضیح |
 |:--|:--|:--|
-| `OCR_ENGINE` | `qwen3vl-fa` | موتور بازخوانی خط |
+| `OCR_ENGINE` | `qwen3vl-fa` | موتور بازخوانی خط؛ `qwen3vl-lora` برای فاین‌تیون اختصاصی پروژه |
 | `OCR_ALLOW_REMOTE` | `0` | با `1`، تصاویر به API خارجی تعریف‌شده در `VLM_API_BASE` فرستاده می‌شوند |
 | `OCR_POST_CORRECT` | `0` | تصحیح املایی با Ollama محلی (در ارزیابی، بهبودی نداشت) |
 | `OCR_MAX_PIXELS` | `1000000` | برش‌های بزرگ‌تر پیش از بازخوانی کوچک می‌شوند |
@@ -142,6 +151,7 @@ main.py                 سرویس وب (FastAPI) و مسیرهای API
 static/index.html       رابط کاربری فارسی: آپلود، ویرایش، دانلود
 pipeline/               پیش‌پردازش، چیدمان، خط‌یاب، OCR، خروجی Word
 htr_eval/               موتورهای بازخوانی خط و worker جداگانه
+adapters/               فاین‌تیون اختصاصی (LoRA، ۶۷ مگابایت) روی مدل پایهٔ فارسی
 training/finetune/      اسکریپت تنظیم دقیق (QLoRA) برای پژوهش‌های بعدی
 scripts/                آماده‌سازی مدل‌ها، ارزیابی، self-test کانتینر
 eval/reports/           گزارش‌های ارزیابی و پیش‌بینی‌های هر خط
@@ -160,7 +170,7 @@ eval/reports/           گزارش‌های ارزیابی و پیش‌بینی�
 
 **Measured accuracy** (held-out gold set: 240 lines from 4 documents, 168 legible lines scored): 63.9% character accuracy (95% CI 59.7–68.0%) and 26.1% word accuracy, at about 1 s per line on an Apple M2. An optional local LLM post-correction gave no measurable gain. Treat the output as a draft for human review.
 
-**Deploy:** `docker load -i persian-exam-ocr-1.0.tar.gz && docker compose up -d`. The image contains all model weights and runs with `HF_HUB_OFFLINE=1`, and a pre-flight self-test refuses to start if anything is missing. No GPU is required.
+**Deploy:** `git clone … && ./scripts/install.sh` downloads the models once, builds a self-contained image that runs with `HF_HUB_OFFLINE=1`, and starts the service; a pre-flight self-test refuses to start if anything is missing. No GPU is required. The project's own LoRA fine-tune ships in `adapters/` (`OCR_ENGINE=qwen3vl-lora`, 63.5% char accuracy, on par with the base model).
 
 **API:** `POST /upload`, `POST /update/{job_id}`, `GET /download/{job_id}`, `GET /status/{job_id}`, `GET /health`; Swagger at `/docs`.
 

@@ -143,8 +143,9 @@ ENGINES = {
     "surya": SuryaRec,
     # Default engine of the web app (best measured on the gold set, see eval/reports).
     "qwen3vl-fa": lambda: HFVisionLM("qwen3vl-fa", QWEN_FA),
-    # Optional LoRA adapters (experimental; scored lower on the gold set).
-    "qwen3vl-lora": lambda: HFVisionLM("qwen3vl-lora", QWEN_FA, adapter=os.environ.get("LORA_ADAPTER", "models/qwen3vl-lora")),
+    # Our LoRA fine-tune of the same base on Persian exam-note lines (adapters/, 67 MB).
+    "qwen3vl-lora": lambda: HFVisionLM("qwen3vl-lora", QWEN_FA, adapter=os.environ.get("LORA_ADAPTER", "adapters/qwen3vl-fa-lora-v2")),
+    # Experimental adapter on Qwen2.5-VL-3B (not shipped; scored lower).
     "qwen25vl-master-lora": lambda: HFVisionLM(
         "qwen25vl-master-lora",
         os.environ.get("BASE_MODEL_ID", "Qwen/Qwen2.5-VL-3B-Instruct"),

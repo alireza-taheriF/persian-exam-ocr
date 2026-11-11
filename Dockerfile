@@ -62,6 +62,7 @@ COPY models/hf /app/models/hf
 COPY main.py LICENSE README.md /app/
 COPY pipeline /app/pipeline
 COPY htr_eval /app/htr_eval
+COPY adapters /app/adapters
 COPY training /app/training
 COPY scripts /app/scripts
 COPY static /app/static
