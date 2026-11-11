@@ -7,7 +7,6 @@
 ![char accuracy](https://img.shields.io/badge/char%20accuracy-63.9%25%20(gold%20set)-blue?style=flat-square)
 ![python](https://img.shields.io/badge/python-3.12-3776AB?style=flat-square&logo=python&logoColor=white)
 ![docker](https://img.shields.io/badge/docker-ready-2496ED?style=flat-square&logo=docker&logoColor=white)
-![license](https://img.shields.io/badge/license-GPL--3.0-lightgrey?style=flat-square)
 
 **تصویر یا PDF برگه را بدهید، متن فارسی قابل‌ویرایش و فایل Word راست‌چین بگیرید؛ بدون اینترنت و بدون ارسال هیچ داده‌ای به بیرون از سرور.**
 
@@ -147,22 +146,6 @@ training/finetune/      اسکریپت تنظیم دقیق (QLoRA) برای پژ
 scripts/                آماده‌سازی مدل‌ها، ارزیابی، self-test کانتینر
 eval/reports/           گزارش‌های ارزیابی و پیش‌بینی‌های هر خط
 ```
-
-## گام‌های بعدی
-
-- [ ] جمع‌آوری برگه‌های واقعی دانشگاه، با رضایت دانشجو، برای تنظیم دقیق مدل روی دست‌خط هدف
-- [ ] بزرگ‌تر کردن مجموعهٔ طلایی (بیش از ۴ سند) تا ارزیابی قابل‌اتکاتر شود
-- [ ] صف کار ناهمگام و ذخیرهٔ پایدار وضعیت، برای بار همزمان زیاد
-- [ ] تشخیص بهتر خط‌های هم‌پوشان در دفترچه‌های خط‌دار
-
-## مجوز و منابع
-
-کد این مخزن تحت مجوز **GPL-3.0-or-later** منتشر شده است، چون از کتابخانهٔ Surya (GPL-3.0) استفاده می‌کند.
-
-مدل‌ها مجوز جداگانه دارند:
-
-- **[Qwen3-VL-2B-Persian-Arabic-OCR](https://huggingface.co/mohajesmaeili/Qwen3-VL-2B-Persian-Arabic-Ocr-v1.0):** مدل بازخوانی خط، تنظیم‌شده روی Qwen3-VL. مجوز را در صفحهٔ مدل ببینید.
-- **[Surya](https://github.com/VikParuchuri/surya):** وزن‌های مدل تحت `cc-by-nc-sa-4.0`. استفادهٔ پژوهشی و آموزشی مجاز است.
 
 **توسعه‌دهنده:** علیرضا طاهری فخر — [github.com/alireza-taheriF](https://github.com/alireza-taheriF)
 
