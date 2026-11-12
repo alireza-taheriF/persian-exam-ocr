@@ -31,3 +31,6 @@ wheels/.complete
 .DS_Store
 .idea/
 .vscode/
+
+# per-line predictions carry gold text; keep them local
+dataset/reports/*.preds.jsonl
