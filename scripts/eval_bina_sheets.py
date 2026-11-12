@@ -22,7 +22,10 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from safetensors.numpy import load_file
+try:
+    from safetensors.numpy import load_file
+except ImportError:  # only the bina engine needs it
+    load_file = None
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -89,6 +92,50 @@ class Recognizer:
         return flip(visual, base_rtl=True), float(conf[keep].mean()) if keep.any() else 0.0
 
 
+class PaddleRec:
+    """PaddleOCR text-recognition ONNX model (CTCLabelDecode), e.g. arabic_PP-OCRv5_mobile_rec_onnx.
+    Preprocessing = PaddleOCR resize_norm_img (H=48, keep aspect, min width 320, (x/255-.5)/.5, right-pad 0);
+    decoding = greedy CTC, blank=0, dict + space, then PaddleOCR's pred_reverse for Arabic-script models."""
+
+    def __init__(self, model_dir: Path, reverse: bool = True):
+        import onnxruntime as ort
+        import yaml
+        so = ort.SessionOptions()
+        so.log_severity_level = 3
+        self.sess = ort.InferenceSession(str(model_dir / "inference.onnx"), so)
+        self.chars = ["<blank>"] + yaml.safe_load((model_dir / "inference.yml").read_text())["PostProcess"]["character_dict"] + [" "]
+        self.reverse = reverse
+
+    @staticmethod
+    def pred_reverse(pred: str) -> str:
+        import re
+        out, cur = [], ""
+        for c in pred:
+            if not re.search("[a-zA-Z0-9 :*./%+-]", c):
+                if cur:
+                    out.append(cur)
+                out.append(c)
+                cur = ""
+            else:
+                cur += c
+        if cur:
+            out.append(cur)
+        return "".join(out[::-1])
+
+    def read(self, gray: np.ndarray) -> tuple[str, float]:
+        h, w = gray.shape
+        img_w = int(48 * max(320 / 48, w / h))
+        rw = min(img_w, math.ceil(48 * w / h))
+        im = cv2.resize(cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR), (rw, 48)).astype(np.float32)
+        x = np.zeros((1, 3, 48, img_w), np.float32)
+        x[0, :, :, :rw] = ((im / 255. - .5) / .5).transpose(2, 0, 1)
+        pr = self.sess.run(None, {self.sess.get_inputs()[0].name: x})[0][0]
+        best, conf = pr.argmax(1), pr.max(1)
+        keep = (best != 0) & np.concatenate(([True], best[1:] != best[:-1]))
+        text = "".join(self.chars[t] for t in best[keep])
+        return (self.pred_reverse(text) if self.reverse else text), float(conf[keep].mean()) if keep.any() else 0.0
+
+
 def is_dark_line(gray: np.ndarray) -> bool:
     lo, med, hi = np.percentile(gray, (2, 50, 98))
     return bool(hi - med > 2 * (med - lo) + 8)
@@ -149,9 +196,14 @@ def main() -> int:
     ap.add_argument("--label", default="bina_rizeh_sheets")
     ap.add_argument("--out-dir", type=Path, default=ROOT / "dataset" / "reports")
     ap.add_argument("--dump-crops", type=Path)
+    ap.add_argument("--engine", choices=["bina", "paddle"], default="bina")
+    ap.add_argument("--paddle-dir", type=Path, help="folder with inference.onnx + inference.yml")
+    ap.add_argument("--no-reverse", action="store_true", help="paddle: skip pred_reverse")
     args = ap.parse_args()
 
-    rec = Recognizer(BINA / "model.safetensors")
+    rec = PaddleRec(args.paddle_dir, not args.no_reverse) if args.engine == "paddle" else Recognizer(BINA / "model.safetensors")
+    engine_desc = (f"PaddleOCR rec {args.paddle_dir.name} (onnxruntime, greedy CTC, pred_reverse={not args.no_reverse})"
+                   if args.engine == "paddle" else "Bina-0.4-Rizeh recognizer only (95k Indra CTC, numpy port, greedy, no confidence filter)")
     if args.gold:
         rows = [json.loads(l) for l in open(args.gold, encoding="utf-8") if l.strip()]
         key = {r["image_path"]: {"text": r["text"], "doc": r["source_document"]} for r in rows}
@@ -184,7 +236,7 @@ def main() -> int:
         if ix:
             by_len[b] = score([refs[k] for k in ix], [hyps[k] for k in ix])
     report = {
-        "name": args.label, "engine": "Bina-0.4-Rizeh recognizer only (95k Indra CTC, numpy port, greedy, no confidence filter)",
+        "name": args.label, "engine": engine_desc,
         "gold_lines": len(key), "answered": len(ids),
         "missing_ids": sorted(set(key) - set(preds)),
         "overall": score(refs, hyps),
