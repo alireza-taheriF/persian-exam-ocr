@@ -142,26 +142,32 @@ def score(refs, hyps):
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--key", type=Path, required=True)
-    ap.add_argument("--sheets", type=Path, nargs="+", required=True)
+    ap.add_argument("--key", type=Path, help="contact-sheet key.json (with --sheets)")
+    ap.add_argument("--sheets", type=Path, nargs="+")
+    ap.add_argument("--gold", type=Path, help="gold.jsonl: read the original line crops instead of sheets")
+    ap.add_argument("--data-root", type=Path, default=ROOT, help="folder the gold image_path values are relative to")
     ap.add_argument("--label", default="bina_rizeh_sheets")
     ap.add_argument("--out-dir", type=Path, default=ROOT / "dataset" / "reports")
     ap.add_argument("--dump-crops", type=Path)
     args = ap.parse_args()
 
-    key = json.loads(args.key.read_text(encoding="utf-8"))
     rec = Recognizer(BINA / "model.safetensors")
-    preds, secs, n = {}, [], 0
-    for sheet in args.sheets:
-        for gray in sheet_rows(sheet):
-            n += 1
-            if args.dump_crops:
-                args.dump_crops.mkdir(parents=True, exist_ok=True)
-                cv2.imwrite(str(args.dump_crops / f"{n:03d}.png"), gray)
-            t0 = time.time()
-            text, conf = rec.read(gray)
-            secs.append(time.time() - t0)
-            preds[str(n)] = {"pred": text, "confidence": round(conf, 3)}
+    if args.gold:
+        rows = [json.loads(l) for l in open(args.gold, encoding="utf-8") if l.strip()]
+        key = {r["image_path"]: {"text": r["text"], "doc": r["source_document"]} for r in rows}
+        items = ((r["image_path"], cv2.imread(str(args.data_root / r["image_path"]), cv2.IMREAD_GRAYSCALE)) for r in rows)
+    else:
+        key = json.loads(args.key.read_text(encoding="utf-8"))
+        items = ((str(n), g) for n, g in enumerate((g for s in args.sheets for g in sheet_rows(s)), 1))
+    preds, secs = {}, []
+    for n, gray in items:
+        if args.dump_crops:
+            args.dump_crops.mkdir(parents=True, exist_ok=True)
+            cv2.imwrite(str(args.dump_crops / f"{len(preds) + 1:03d}.png"), gray)
+        t0 = time.time()
+        text, conf = rec.read(gray)
+        secs.append(time.time() - t0)
+        preds[n] = {"pred": text, "confidence": round(conf, 3)}
     ids = [i for i in preds if i in key and key[i]["text"].strip()]
     refs = [normalize_text(key[i]["text"]) for i in ids]
     hyps = [normalize_text(preds[i]["pred"]) for i in ids]
@@ -180,13 +186,14 @@ def main() -> int:
     report = {
         "name": args.label, "engine": "Bina-0.4-Rizeh recognizer only (95k Indra CTC, numpy port, greedy, no confidence filter)",
         "gold_lines": len(key), "answered": len(ids),
-        "missing_ids": sorted((set(key) - set(preds)), key=int),
+        "missing_ids": sorted(set(key) - set(preds)),
         "overall": score(refs, hyps),
         "cer_ci95_bootstrap": [round(boots[25], 4), round(boots[974], 4)],
         "exact_line_match_pct": round(100 * sum(a == b for a, b in zip(refs, hyps)) / len(refs), 2),
         "by_document": by_doc, "by_length": by_len,
         "seconds_per_line_median": round(sorted(secs)[len(secs) // 2], 3),
-        "caveat": "lines cropped from resized contact sheets, not the original lines_v3 crops",
+        "input": "original lines_v3 crops" if args.gold else "lines cropped from resized contact sheets, not the original lines_v3 crops",
+        "illegible_rows_returned_empty_pct": round(100 * sum(not preds[i]["pred"].strip() for i in key if not key[i]["text"].strip()) / max(1, sum(not v["text"].strip() for v in key.values())), 2),
         "created": time.strftime("%Y-%m-%dT%H:%M:%S"),
     }
     args.out_dir.mkdir(parents=True, exist_ok=True)
